@@ -1,0 +1,2 @@
+CREATE TABLE IF NOT EXISTS tickets(order_id uuid PRIMARY KEY,customer_name text NOT NULL,table_number int NOT NULL,items jsonb NOT NULL,correlation_id uuid NOT NULL,status text NOT NULL DEFAULT 'QUEUED',created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS processed_events(event_id uuid PRIMARY KEY,processed_at timestamptz NOT NULL DEFAULT now());

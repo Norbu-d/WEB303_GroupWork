@@ -1,0 +1,1 @@
+{"name":"@food/runtime","version":"1.0.0","main":"dist/index.js","types":"dist/index.d.ts","scripts":{"build":"tsc -p tsconfig.json"},"dependencies":{"@food/event-contracts":"*","amqplib":"^0.10.8","pg":"^8.16.3"},"devDependencies":{"@types/amqplib":"^0.10.7","@types/node":"^20.14.0","@types/pg":"^8.15.5","typescript":"^5.5.0"}}

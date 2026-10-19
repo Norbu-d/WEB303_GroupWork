@@ -1,0 +1,108 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: food-rabbitmq
+    ports:
+      - "5672:5672"     # AMQP
+      - "15672:15672"   # Management UI -> http://localhost:15672
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-food}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-food_pass}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq   # keeps durable queues across restarts
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: food-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${PG_ADMIN_USER:-postgres}
+      POSTGRES_PASSWORD: ${PG_ADMIN_PASS:-postgres_admin_pass}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  order-service:
+    build: { context: ., dockerfile: services/order-service/Dockerfile }
+    environment:
+      PORT: 4001
+      DATABASE_URL: postgres://order_user:order_pass@postgres:5432/order_db
+      AMQP_URL: amqp://food:food_pass@rabbitmq:5672
+    depends_on:
+      postgres: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+    healthcheck: { test: ["CMD", "node", "-e", "fetch('http://localhost:4001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"], interval: 10s, timeout: 3s, retries: 10 }
+
+  menu-service:
+    build: { context: ., dockerfile: services/menu-service/Dockerfile }
+    environment: { PORT: 4002, DATABASE_URL: postgres://menu_user:menu_pass@postgres:5432/menu_db }
+    depends_on: { postgres: { condition: service_healthy } }
+
+  inventory-service:
+    build: { context: ., dockerfile: services/inventory-service/Dockerfile }
+    environment:
+      PORT: 4003
+      DATABASE_URL: postgres://inventory_user:inventory_pass@postgres:5432/inventory_db
+      AMQP_URL: amqp://food:food_pass@rabbitmq:5672
+    depends_on:
+      postgres: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+
+  kitchen-service:
+    build: { context: ., dockerfile: services/kitchen-service/Dockerfile }
+    environment:
+      PORT: 4004
+      DATABASE_URL: postgres://kitchen_user:kitchen_pass@postgres:5432/kitchen_db
+      AMQP_URL: amqp://food:food_pass@rabbitmq:5672
+    depends_on:
+      postgres: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+
+  notification-service:
+    build: { context: ., dockerfile: services/notification-service/Dockerfile }
+    environment:
+      PORT: 4005
+      DATABASE_URL: postgres://notification_user:notification_pass@postgres:5432/notification_db
+      AMQP_URL: amqp://food:food_pass@rabbitmq:5672
+    depends_on:
+      postgres: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+
+  api-gateway:
+    build: { context: ., dockerfile: services/api-gateway/Dockerfile }
+    ports: ["4000:4000"]
+    environment:
+      PORT: 4000
+      WEB_ORIGIN: http://localhost:5173
+      MENU_URL: http://menu-service:4002
+      ORDER_URL: http://order-service:4001
+      KITCHEN_URL: http://kitchen-service:4004
+      NOTIFICATION_URL: http://notification-service:4005
+      INVENTORY_URL: http://inventory-service:4003
+    depends_on:
+      order-service: { condition: service_healthy }
+      menu-service: { condition: service_started }
+      kitchen-service: { condition: service_started }
+      inventory-service: { condition: service_started }
+      notification-service: { condition: service_started }
+
+  web:
+    build: { context: ., dockerfile: web/Dockerfile }
+    ports: ["5173:5173"]
+    environment: { VITE_API_PROXY: http://api-gateway:4000 }
+    depends_on: [api-gateway]
+
+volumes:
+  rabbitmq_data:
+  postgres_data:

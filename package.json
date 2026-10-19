@@ -1,0 +1,33 @@
+{
+  "name": "food-ordering",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "services/*",
+    "web"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build:contracts": "npm run build -w @food/event-contracts",
+    "build": "npm run build:contracts && npm run build --workspaces --if-present",
+    "dev": "docker compose up --build",
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down",
+    "infra:reset": "docker compose down -v"
+  },
+  "dependencies": {
+    "amqplib": "^2.2.0",
+    "cors": "^2.8.6",
+    "express": "^5.3.0",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@types/amqplib": "^0.10.8",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/pg": "^8.23.1",
+    "tsx": "^4.23.15"
+  }
+}
